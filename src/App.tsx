@@ -1,35 +1,62 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import { LoginForm } from './components/LoginForm/LoginForm';
+import { SearchBar } from './components/SearchBar/SearchBar';
+import { FilterBar } from './components/FilterBar/FilterBar';
+import { ClassList } from './components/ClassList/ClassList';
+import { fetchBrowseCategories } from './api/pelotonClient';
+import { useClassSearch } from './hooks/useClassSearch';
+import type { BrowseCategory } from './api/types';
+import styles from './App.module.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState<BrowseCategory[]>([]);
+
+  const { classes, loading, error } = useClassSearch(
+    isLoggedIn ? searchQuery : '',
+    isLoggedIn ? selectedCategory : '__disabled__'
+  );
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchBrowseCategories()
+      .then((res) => setCategories(res.browse_categories ?? []))
+      .catch(() => {
+        // Non-fatal — filters just won't show
+      });
+  }, [isLoggedIn]);
+
+  if (!isLoggedIn) {
+    return <LoginForm onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className={styles.app}>
+      <header className={styles.header}>
+        <span className={styles.logo}>PELOTON</span>
+        <div className={styles.searchWrapper}>
+          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+        </div>
+      </header>
+
+      <main className={styles.main}>
+        <div className={styles.controls}>
+          <p className={styles.resultCount}>
+            {!loading && `${classes.length} class${classes.length !== 1 ? 'es' : ''} found`}
+          </p>
+          <FilterBar
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+        </div>
+
+        <ClassList classes={classes} loading={loading} error={error} />
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
