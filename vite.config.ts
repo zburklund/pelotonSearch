@@ -45,21 +45,28 @@ function pelotonProxyPlugin(): Plugin {
       server.middlewares.use('/api', (req, res) => {
         const path = req.url ?? '/';
 
+        // Build a clean headers object — only include string/string[] values
+        // and drop any hop-by-hop or proxy-added headers that Node rejects.
+        const SKIP_HEADERS = new Set([
+          'host', 'cookie',
+          'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto',
+          'connection', 'keep-alive', 'transfer-encoding', 'upgrade',
+        ]);
+        const forwardHeaders: Record<string, string | string[]> = {};
+        for (const [key, val] of Object.entries(req.headers)) {
+          if (!SKIP_HEADERS.has(key) && val !== undefined) {
+            forwardHeaders[key] = val as string | string[];
+          }
+        }
+        forwardHeaders['host'] = PELOTON_HOST;
+        if (sessionId) forwardHeaders['cookie'] = `peloton_session_id=${sessionId}`;
+
         const options: https.RequestOptions = {
           hostname: PELOTON_HOST,
           port: 443,
           path: `/api${path}`,
           method: req.method ?? 'GET',
-          headers: {
-            // Forward most incoming headers but override host + cookie
-            ...req.headers,
-            host: PELOTON_HOST,
-            cookie: sessionId ? `peloton_session_id=${sessionId}` : '',
-            // Remove headers that can cause issues with the upstream
-            'x-forwarded-for': undefined as unknown as string,
-            'x-forwarded-host': undefined as unknown as string,
-            'x-forwarded-proto': undefined as unknown as string,
-          },
+          headers: forwardHeaders,
         };
 
         const proxyReq = https.request(options, (proxyRes) => {
