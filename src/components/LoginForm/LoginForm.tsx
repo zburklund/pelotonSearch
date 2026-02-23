@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { setSessionId, verifySession } from '../../api/pelotonClient';
+import { registerSession, verifySession } from '../../api/pelotonClient';
 import styles from './LoginForm.module.css';
 
 interface LoginFormProps {
@@ -19,14 +19,17 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
     setLoading(true);
     setError(null);
-    setSessionId(trimmed);
-
-    const valid = await verifySession();
-    if (valid) {
-      onLogin();
-    } else {
-      setSessionId('');
-      setError('Session ID not recognized. Make sure you copied it correctly and are still logged into onepeloton.com.');
+    try {
+      await registerSession(trimmed);
+      const valid = await verifySession();
+      if (valid) {
+        onLogin();
+      } else {
+        await registerSession(''); // clear bad session from proxy
+        setError('Session ID not recognized. Make sure you copied it correctly and are still logged into onepeloton.com.');
+      }
+    } catch {
+      setError('Could not connect to the proxy. Is the dev server running?');
     }
     setLoading(false);
   }

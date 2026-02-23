@@ -15,8 +15,9 @@ function App() {
   const [categories, setCategories] = useState<BrowseCategory[]>([]);
 
   const { classes, loading, error } = useClassSearch(
-    isLoggedIn ? searchQuery : '',
-    isLoggedIn ? selectedCategory : '__disabled__'
+    searchQuery,
+    selectedCategory,
+    isLoggedIn
   );
 
   useEffect(() => {

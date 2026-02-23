@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { fetchArchivedRides } from '../api/pelotonClient';
 import type { PelotonClass } from '../api/types';
 
-export function useClassSearch(query: string, category: string) {
+export function useClassSearch(query: string, category: string, enabled: boolean) {
   const [classes, setClasses] = useState<PelotonClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const controller = new AbortController();
     let debounceTimer: ReturnType<typeof setTimeout>;
 
@@ -53,7 +55,7 @@ export function useClassSearch(query: string, category: string) {
       clearTimeout(debounceTimer);
       controller.abort();
     };
-  }, [query, category]);
+  }, [query, category, enabled]);
 
   return { classes, loading, error };
 }
