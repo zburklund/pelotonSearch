@@ -59,7 +59,12 @@ function pelotonProxyPlugin(): Plugin {
           }
         }
         forwardHeaders['host'] = PELOTON_HOST;
+        forwardHeaders['origin'] = 'https://members.onepeloton.com';
+        forwardHeaders['referer'] = 'https://members.onepeloton.com/';
+        forwardHeaders['peloton-platform'] = 'web';
         if (sessionId) forwardHeaders['cookie'] = `peloton_session_id=${sessionId}`;
+
+        console.log(`[peloton-proxy] ${req.method} /api${path} | session: ${sessionId ? sessionId.slice(0, 8) + '…' : 'NONE'} | cookie: ${forwardHeaders['cookie'] ? 'SET' : 'MISSING'}`);
 
         const options: https.RequestOptions = {
           hostname: PELOTON_HOST,
@@ -70,6 +75,7 @@ function pelotonProxyPlugin(): Plugin {
         };
 
         const proxyReq = https.request(options, (proxyRes) => {
+          console.log(`[peloton-proxy] ← ${proxyRes.statusCode} /api${path}`);
           res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
           proxyRes.pipe(res, { end: true });
         });
