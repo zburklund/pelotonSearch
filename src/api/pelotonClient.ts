@@ -37,7 +37,10 @@ export async function fetchArchivedRides(params: {
   signal?: AbortSignal;
 }): Promise<ArchivedRidesResponse> {
   const qs = new URLSearchParams({
-    limit: String(params.limit ?? 48),
+    content_format: 'audio,video',
+    sort_by: 'original_air_time',
+    desc: 'true',
+    limit: String(params.limit ?? 18),
     page: String(params.page ?? 0),
   });
   if (params.browseCategory) {
