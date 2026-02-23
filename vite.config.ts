@@ -6,21 +6,21 @@ import https from 'https'
 // ---------------------------------------------------------------------------
 // pelotonProxyPlugin
 //
-// Replaces the built-in Vite proxy for /api routes with a custom middleware
-// that has guaranteed access to the live `sessionId` closure variable.
-// This sidesteps the browser "forbidden header" restriction on Cookie:
-// the browser never sets it — Node does, server-side, on every forwarded req.
+// Custom middleware that forwards /api/* requests to api.onepeloton.com,
+// injecting the Auth0 Bearer token server-side. Browsers block setting the
+// Authorization header to a value obtained cross-origin, so we store it in
+// the Node process via POST /__session and inject it on every proxy request.
 // ---------------------------------------------------------------------------
 function pelotonProxyPlugin(): Plugin {
-  let sessionId = '';
+  let bearerToken = '';
   const PELOTON_HOST = 'api.onepeloton.com';
 
   return {
     name: 'peloton-proxy',
     configureServer(server) {
 
-      // POST /__session  — store session ID in the Node closure
-      // GET  /__session  — health check
+      // POST /__session { token } — store bearer token in the Node closure
+      // GET  /__session           — health check
       server.middlewares.use('/__session', (req, res) => {
         res.setHeader('Content-Type', 'application/json');
         if (req.method === 'POST') {
@@ -29,26 +29,23 @@ function pelotonProxyPlugin(): Plugin {
           req.on('end', () => {
             try {
               const parsed = JSON.parse(body);
-              sessionId = parsed.sessionId ?? '';
+              bearerToken = parsed.token ?? '';
             } catch { /* ignore */ }
             res.writeHead(200);
             res.end(JSON.stringify({ ok: true }));
           });
         } else {
           res.writeHead(200);
-          res.end(JSON.stringify({ hasSession: !!sessionId }));
+          res.end(JSON.stringify({ hasToken: !!bearerToken }));
         }
       });
 
-      // Proxy every /api/* request to api.onepeloton.com, injecting the
-      // Cookie header server-side where the browser restriction doesn't apply.
+      // Proxy every /api/* request to api.onepeloton.com with Bearer auth.
       server.middlewares.use('/api', (req, res) => {
         const path = req.url ?? '/';
 
-        // Build a clean headers object — only include string/string[] values
-        // and drop any hop-by-hop or proxy-added headers that Node rejects.
         const SKIP_HEADERS = new Set([
-          'host', 'cookie',
+          'host', 'cookie', 'authorization',
           'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto',
           'connection', 'keep-alive', 'transfer-encoding', 'upgrade',
         ]);
@@ -62,12 +59,13 @@ function pelotonProxyPlugin(): Plugin {
         forwardHeaders['origin'] = 'https://members.onepeloton.com';
         forwardHeaders['referer'] = 'https://members.onepeloton.com/';
         forwardHeaders['peloton-platform'] = 'web';
+        forwardHeaders['x-requested-with'] = 'XmlHttpRequest';
         forwardHeaders['user-agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-        forwardHeaders['accept'] = 'application/json';
-        forwardHeaders['accept-language'] = 'en-US,en;q=0.9';
-        if (sessionId) forwardHeaders['cookie'] = `peloton_session_id=${sessionId}`;
+        forwardHeaders['accept'] = 'application/json, text/plain, */*';
+        forwardHeaders['accept-language'] = 'en-US';
+        if (bearerToken) forwardHeaders['authorization'] = `Bearer ${bearerToken}`;
 
-        console.log(`[peloton-proxy] ${req.method} /api${path} | session: ${sessionId ? sessionId.slice(0, 8) + '…' : 'NONE'} | cookie: ${forwardHeaders['cookie'] ? 'SET' : 'MISSING'}`);
+        console.log(`[peloton-proxy] ${req.method} /api${path} | token: ${bearerToken ? bearerToken.slice(0, 12) + '…' : 'NONE'}`);
 
         const options: https.RequestOptions = {
           hostname: PELOTON_HOST,
@@ -91,7 +89,6 @@ function pelotonProxyPlugin(): Plugin {
           }
         });
 
-        // Pipe request body for POST/PUT/PATCH
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           req.pipe(proxyReq, { end: true });
         } else {
@@ -104,5 +101,4 @@ function pelotonProxyPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), pelotonProxyPlugin()],
-  // No server.proxy needed — the plugin handles /api and /__session
 })

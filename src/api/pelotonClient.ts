@@ -1,21 +1,19 @@
 import type { ArchivedRidesResponse, BrowseCategoriesResponse } from './types';
 
 /**
- * Register the session ID with the Vite dev-server proxy so it can
- * inject it as a Cookie header on every /api request. Browsers block
- * scripts from setting the Cookie header directly (forbidden header),
- * so the proxy handles cookie injection server-side instead.
+ * Register the Auth0 Bearer token with the Vite dev-server proxy so it can
+ * inject it as an Authorization header on every /api request.
  */
-export async function registerSession(sessionId: string): Promise<void> {
+export async function registerToken(token: string): Promise<void> {
   const res = await fetch('/__session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId }),
+    body: JSON.stringify({ token }),
   });
-  if (!res.ok) throw new Error('Failed to register session with proxy');
+  if (!res.ok) throw new Error('Failed to register token with proxy');
 }
 
-export async function verifySession(): Promise<boolean> {
+export async function verifyToken(): Promise<boolean> {
   try {
     const res = await fetch('/api/me');
     return res.ok;
