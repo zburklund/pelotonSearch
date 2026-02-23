@@ -62,6 +62,9 @@ function pelotonProxyPlugin(): Plugin {
         forwardHeaders['origin'] = 'https://members.onepeloton.com';
         forwardHeaders['referer'] = 'https://members.onepeloton.com/';
         forwardHeaders['peloton-platform'] = 'web';
+        forwardHeaders['user-agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+        forwardHeaders['accept'] = 'application/json';
+        forwardHeaders['accept-language'] = 'en-US,en;q=0.9';
         if (sessionId) forwardHeaders['cookie'] = `peloton_session_id=${sessionId}`;
 
         console.log(`[peloton-proxy] ${req.method} /api${path} | session: ${sessionId ? sessionId.slice(0, 8) + '…' : 'NONE'} | cookie: ${forwardHeaders['cookie'] ? 'SET' : 'MISSING'}`);

@@ -37,7 +37,6 @@ export async function fetchArchivedRides(params: {
   signal?: AbortSignal;
 }): Promise<ArchivedRidesResponse> {
   const qs = new URLSearchParams({
-    joins: 'ride,ride.instructor',
     limit: String(params.limit ?? 48),
     page: String(params.page ?? 0),
   });
