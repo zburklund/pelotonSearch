@@ -1,58 +1,92 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import type { IncomingMessage, ServerResponse } from 'http'
+import type { Plugin } from 'vite'
+import https from 'https'
 
-// Holds the session ID in the Node process so the proxy can inject it.
-// Updated via the /__session endpoint called from the React app.
-let pelotonSessionId = '';
+// ---------------------------------------------------------------------------
+// pelotonProxyPlugin
+//
+// Replaces the built-in Vite proxy for /api routes with a custom middleware
+// that has guaranteed access to the live `sessionId` closure variable.
+// This sidesteps the browser "forbidden header" restriction on Cookie:
+// the browser never sets it — Node does, server-side, on every forwarded req.
+// ---------------------------------------------------------------------------
+function pelotonProxyPlugin(): Plugin {
+  let sessionId = '';
+  const PELOTON_HOST = 'api.onepeloton.com';
+
+  return {
+    name: 'peloton-proxy',
+    configureServer(server) {
+
+      // POST /__session  — store session ID in the Node closure
+      // GET  /__session  — health check
+      server.middlewares.use('/__session', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+          req.on('end', () => {
+            try {
+              const parsed = JSON.parse(body);
+              sessionId = parsed.sessionId ?? '';
+            } catch { /* ignore */ }
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true }));
+          });
+        } else {
+          res.writeHead(200);
+          res.end(JSON.stringify({ hasSession: !!sessionId }));
+        }
+      });
+
+      // Proxy every /api/* request to api.onepeloton.com, injecting the
+      // Cookie header server-side where the browser restriction doesn't apply.
+      server.middlewares.use('/api', (req, res) => {
+        const path = req.url ?? '/';
+
+        const options: https.RequestOptions = {
+          hostname: PELOTON_HOST,
+          port: 443,
+          path: `/api${path}`,
+          method: req.method ?? 'GET',
+          headers: {
+            // Forward most incoming headers but override host + cookie
+            ...req.headers,
+            host: PELOTON_HOST,
+            cookie: sessionId ? `peloton_session_id=${sessionId}` : '',
+            // Remove headers that can cause issues with the upstream
+            'x-forwarded-for': undefined as unknown as string,
+            'x-forwarded-host': undefined as unknown as string,
+            'x-forwarded-proto': undefined as unknown as string,
+          },
+        };
+
+        const proxyReq = https.request(options, (proxyRes) => {
+          res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+          proxyRes.pipe(res, { end: true });
+        });
+
+        proxyReq.on('error', (err) => {
+          console.error('[peloton-proxy] upstream error:', err.message);
+          if (!res.headersSent) {
+            res.writeHead(502);
+            res.end(JSON.stringify({ error: 'Upstream error', detail: err.message }));
+          }
+        });
+
+        // Pipe request body for POST/PUT/PATCH
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          req.pipe(proxyReq, { end: true });
+        } else {
+          proxyReq.end();
+        }
+      });
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    proxy: {
-      // Special endpoint: the React app POSTs the session ID here so the
-      // Node proxy process can store and forward it as a Cookie header.
-      '/__session': {
-        target: 'http://localhost:5173',
-        bypass(req: IncomingMessage, res: ServerResponse | undefined) {
-          if (!res) return undefined;
-          if (req.method === 'POST') {
-            let body = '';
-            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
-            req.on('end', () => {
-              try {
-                const { sessionId } = JSON.parse(body);
-                pelotonSessionId = sessionId ?? '';
-              } catch { /* ignore parse errors */ }
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: true }));
-            });
-            return null; // handled — don't forward to proxy target
-          }
-          // GET: return current status
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ hasSession: !!pelotonSessionId }));
-          return null;
-        },
-      },
-
-      // All Peloton API calls: strip the custom header and inject the
-      // real Cookie so the browser never touches the forbidden header.
-      '/api': {
-        target: 'https://api.onepeloton.com',
-        changeOrigin: true,
-        secure: true,
-        configure(proxy) {
-          proxy.on('proxyReq', (proxyReq) => {
-            // Remove the forwarding header (sent by the React app)
-            proxyReq.removeHeader('x-peloton-session-id');
-            // Inject the real cookie if we have a session
-            if (pelotonSessionId) {
-              proxyReq.setHeader('Cookie', `peloton_session_id=${pelotonSessionId}`);
-            }
-          });
-        },
-      },
-    },
-  },
+  plugins: [react(), pelotonProxyPlugin()],
+  // No server.proxy needed — the plugin handles /api and /__session
 })
