@@ -35,7 +35,3 @@ export interface BrowseCategoriesResponse {
   browse_categories: BrowseCategory[];
 }
 
-export interface LoginResponse {
-  session_id: string;
-  user_id: string;
-}

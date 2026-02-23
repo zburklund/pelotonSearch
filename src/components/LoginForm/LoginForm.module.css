@@ -4,6 +4,7 @@
   align-items: center;
   justify-content: center;
   background: var(--bg-dark);
+  padding: 2rem 1rem;
 }
 
 .card {
@@ -11,7 +12,7 @@
   border-radius: 12px;
   padding: 2.5rem 2rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -25,18 +26,56 @@
 }
 
 .heading {
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.5rem;
   text-align: center;
 }
 
 .subheading {
   color: var(--text-secondary);
   text-align: center;
-  margin: 0 0 2rem;
-  font-size: 0.9rem;
+  margin: 0 0 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.steps {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.stepsTitle {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.6rem;
+}
+
+.stepsList {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.stepsList strong {
+  color: var(--text-primary);
+}
+
+.stepsList code {
+  background: var(--bg-dark);
+  border-radius: 3px;
+  color: var(--peloton-red);
+  font-size: 0.82rem;
+  padding: 0.1em 0.35em;
 }
 
 .form {
@@ -49,11 +88,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
+  font-family: monospace;
 }
 
 .input {
@@ -61,7 +101,8 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 0.9rem;
+  font-family: monospace;
   padding: 0.65rem 0.875rem;
   outline: none;
   transition: border-color 0.15s;
@@ -71,11 +112,18 @@
   border-color: var(--peloton-red);
 }
 
+.input::placeholder {
+  color: var(--text-secondary);
+  font-family: -apple-system, sans-serif;
+  font-size: 0.875rem;
+}
+
 .error {
   color: #ff6b6b;
   font-size: 0.875rem;
   margin: 0;
   text-align: center;
+  line-height: 1.4;
 }
 
 .button {
@@ -87,7 +135,7 @@
   font-size: 1rem;
   font-weight: 700;
   padding: 0.75rem;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   transition: opacity 0.15s;
 }
 
@@ -96,6 +144,6 @@
 }
 
 .button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }

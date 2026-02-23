@@ -1,24 +1,38 @@
-import type { ArchivedRidesResponse, BrowseCategoriesResponse, LoginResponse } from './types';
+import type { ArchivedRidesResponse, BrowseCategoriesResponse } from './types';
 
-export async function login(usernameOrEmail: string, password: string): Promise<LoginResponse> {
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Peloton-Platform': 'web',
-    },
-    credentials: 'include',
-    body: JSON.stringify({ username_or_email: usernameOrEmail, password }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? 'Login failed');
+// Session ID is set by the user from their browser cookie and injected
+// via the Vite dev server proxy as a Cookie header.
+let _sessionId = '';
+
+export function setSessionId(id: string) {
+  _sessionId = id;
+}
+
+export function getSessionId() {
+  return _sessionId;
+}
+
+function authHeaders(): HeadersInit {
+  return _sessionId
+    ? { Cookie: `peloton_session_id=${_sessionId}` }
+    : {};
+}
+
+export async function verifySession(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/me', {
+      headers: authHeaders(),
+      credentials: 'include',
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
-  return res.json();
 }
 
 export async function fetchBrowseCategories(): Promise<BrowseCategoriesResponse> {
   const res = await fetch('/api/browse_categories?library_type=on_demand', {
+    headers: authHeaders(),
     credentials: 'include',
   });
   if (!res.ok) throw new Error(`Failed to load categories (${res.status})`);
@@ -40,6 +54,7 @@ export async function fetchArchivedRides(params: {
     qs.set('browse_category', params.browseCategory);
   }
   const res = await fetch(`/api/v2/ride/archived?${qs}`, {
+    headers: authHeaders(),
     credentials: 'include',
     signal: params.signal,
   });
